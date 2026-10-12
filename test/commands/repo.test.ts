@@ -163,6 +163,50 @@ describe('repoCommand', () => {
     });
   });
 
+  describe('edit', () => {
+    it('forwards bare --enable-issues and --enable-wiki as enabled', async () => {
+      mockedGhExec.mockResolvedValue('');
+
+      await repoCommand(['edit', '--enable-issues', '--enable-wiki'], ctx);
+
+      expect(mockedGhExec).toHaveBeenCalledWith([
+        'repo', 'edit', 'octo/repo', '--enable-issues=true', '--enable-wiki=true',
+      ]);
+    });
+
+    it('does not swallow the flag after a bare --enable-issues', async () => {
+      mockedGhExec.mockResolvedValue('');
+
+      await repoCommand(['edit', '--enable-issues', '--description', 'New desc'], ctx);
+
+      expect(mockedGhExec).toHaveBeenCalledWith([
+        'repo', 'edit', 'octo/repo', '--description', 'New desc', '--enable-issues=true',
+      ]);
+    });
+
+    it('disables with =false or a following false', async () => {
+      mockedGhExec.mockResolvedValue('');
+
+      await repoCommand(['edit', '--enable-issues=false', '--enable-wiki', 'false'], ctx);
+
+      expect(mockedGhExec).toHaveBeenCalledWith([
+        'repo', 'edit', 'octo/repo', '--enable-issues=false', '--enable-wiki=false',
+      ]);
+    });
+
+    it.each([
+      [['--enable-wiki=yes'], '--enable-wiki must be true or false, got "yes"'],
+      [['--enable-issues='], '--enable-issues must be true or false, got ""'],
+      [['--enable-wiki', '1'], '--enable-wiki must be true or false, got "1"'],
+    ])('rejects %j as a VALIDATION_ERROR naming the flag, without calling gh', async (flagArgs, message) => {
+      const error = await repoCommand(['edit', ...flagArgs], ctx).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AxiError);
+      expect(error).toMatchObject({ code: 'VALIDATION_ERROR', message });
+      expect(mockedGhExec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('creates a repo with required name', async () => {
       mockedGhExec.mockResolvedValue('');
