@@ -187,8 +187,24 @@ function extractQuery(args: string[]): string[] {
   return positionals;
 }
 
-function getSearchRepo(args: string[], ctx?: RepoContext): string | undefined {
-  return getFlag(args, "--repo") ?? ctx?.nwo;
+// gh splits each query argument at its first colon and quotes only what
+// follows, so an argument is a scope when the last whitespace-separated token
+// before that colon is org, user or repo. GitHub ignores uppercase qualifiers.
+const SCOPE_QUALIFIER = /^(?:[^:]*\s)?(?:org|user|repo):/;
+
+function getSearchRepo(
+  args: string[],
+  query: string[],
+  ctx?: RepoContext,
+): string | undefined {
+  const repo = getFlag(args, "--repo");
+  if (repo !== undefined) return repo;
+  if (ctx?.source === "flag") return ctx.nwo; // explicit -R
+  // The ambient repo (cwd origin or GH_REPO) is only a default. Next to a scope
+  // the caller gave, GitHub ANDs, ORs or rejects it, so leave it out then.
+  if (getFlag(args, "--owner") || query.some((q) => SCOPE_QUALIFIER.test(q)))
+    return undefined;
+  return ctx?.nwo;
 }
 
 const COMMON_FILTER_FLAGS = [
@@ -232,7 +248,7 @@ async function searchIssues(
     "--limit",
     limit,
   );
-  const repo = getSearchRepo(args, ctx);
+  const repo = getSearchRepo(args, query, ctx);
   if (repo) ghArgs.push("--repo", repo);
   const owner = getFlag(args, "--owner");
   if (owner) ghArgs.push("--owner", owner);
@@ -292,7 +308,7 @@ async function searchPrs(args: string[], ctx?: RepoContext): Promise<string> {
     "--limit",
     limit,
   );
-  const repo = getSearchRepo(args, ctx);
+  const repo = getSearchRepo(args, query, ctx);
   if (repo) ghArgs.push("--repo", repo);
   const owner = getFlag(args, "--owner");
   if (owner) ghArgs.push("--owner", owner);
@@ -393,7 +409,7 @@ async function searchCommits(
   const limit = getFlag(args, "--limit") ?? DEFAULT_SEARCH_LIMIT;
   const ghArgs = ["search", "commits"];
   ghArgs.push("--json", "sha,commit,repository,author", "--limit", limit);
-  const repo = getSearchRepo(args, ctx);
+  const repo = getSearchRepo(args, query, ctx);
   if (repo) ghArgs.push("--repo", repo);
   const owner = getFlag(args, "--owner");
   if (owner) ghArgs.push("--owner", owner);
@@ -445,7 +461,7 @@ async function searchCode(args: string[], ctx?: RepoContext): Promise<string> {
   const limit = getFlag(args, "--limit") ?? DEFAULT_SEARCH_LIMIT;
   const ghArgs = ["search", "code"];
   ghArgs.push("--json", "path,repository,textMatches", "--limit", limit);
-  const repo = getSearchRepo(args, ctx);
+  const repo = getSearchRepo(args, query, ctx);
   if (repo) ghArgs.push("--repo", repo);
   const owner = getFlag(args, "--owner");
   if (owner) ghArgs.push("--owner", owner);
