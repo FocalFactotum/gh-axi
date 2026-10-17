@@ -2,7 +2,7 @@ import { encode } from '@toon-format/toon';
 import type { RepoContext } from '../context.js';
 import { ghJson, ghExec } from '../gh.js';
 import { AxiError } from '../errors.js';
-import { getFlag, hasFlag, getAllFlags, rejectUnknownFlags } from '../args.js';
+import { getFlag, hasFlag, getAllFlags, rejectUnknownFlags, takeBoolFlag } from '../args.js';
 import {
   field,
   lower,
@@ -18,7 +18,7 @@ import { getSuggestions } from '../suggestions.js';
 
 export const WORKFLOW_FLAGS: Record<string, readonly string[]> = {
   list: ['--limit', '--all'],
-  view: [],
+  view: ['--yaml'],
   run: ['--ref', '--field'],
   enable: [],
   disable: [],
@@ -29,6 +29,8 @@ subcommands[5]:
   list, view <id|name>, run <id|name>, enable <id|name>, disable <id|name>
 flags{list}:
   --limit <n> (default 20), --all
+flags{view}:
+  --yaml (print the workflow YAML instead of metadata)
 flags{run}:
   --ref <git-ref>, --field <key=val> (repeatable)
 examples:
@@ -88,6 +90,11 @@ async function viewWorkflow(args: string[], ctx?: RepoContext): Promise<string> 
   const positionals = args.filter((a) => !a.startsWith('--'));
   const id = positionals[1];
   if (!id) throw new AxiError('Workflow ID or name is required: gh-axi workflow view <id|name>', 'VALIDATION_ERROR');
+
+  if (takeBoolFlag(args, '--yaml')) {
+    const yaml = await ghExec(['workflow', 'view', id, '--yaml'], ctx);
+    return encode({ workflow_yaml: { workflow: id, yaml } });
+  }
 
   const match = await findWorkflow(id, ctx);
 
