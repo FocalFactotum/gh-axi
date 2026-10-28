@@ -5,7 +5,13 @@ import { AxiError } from "../errors.js";
 import { takeBody, truncateBody } from "../body.js";
 import { formatCountLine } from "../format.js";
 import { getSuggestions } from "../suggestions.js";
-import { takeFlag, takeAllFlags, pushRepeated, takeBoolFlag, rejectUnknownFlags } from "../args.js";
+import {
+  takeFlag,
+  takeAllFlags,
+  pushRepeated,
+  takeBoolFlag,
+  rejectUnknownFlags,
+} from "../args.js";
 import {
   field,
   pluck,
@@ -61,7 +67,12 @@ export const PROJECT_FLAGS: Record<string, readonly string[]> = {
   view: ["--owner"],
   "item-list": ["--owner", "--query", "--limit"],
   "field-list": ["--owner", "--limit"],
-  "field-create": ["--owner", "--name", "--data-type", "--single-select-options"],
+  "field-create": [
+    "--owner",
+    "--name",
+    "--data-type",
+    "--single-select-options",
+  ],
   "field-delete": ["--id"],
   "item-add": ["--owner", "--url"],
   "item-create": ["--owner", "--title", "--body", "--body-file"],
@@ -499,13 +510,31 @@ async function projectFieldCreate(
   const options = takeAllFlags(args, "--single-select-options", flags);
   const num = takeProjectNumber(args);
   if (!name || !dataType)
-    throw new AxiError("--name and --data-type are required", "VALIDATION_ERROR");
-  if (!["TEXT", "SINGLE_SELECT", "DATE", "NUMBER"].includes(dataType.toUpperCase()))
-    throw new AxiError("--data-type must be TEXT, SINGLE_SELECT, DATE or NUMBER", "VALIDATION_ERROR");
+    throw new AxiError(
+      "--name and --data-type are required",
+      "VALIDATION_ERROR",
+    );
+  if (
+    !["TEXT", "SINGLE_SELECT", "DATE", "NUMBER"].includes(
+      dataType.toUpperCase(),
+    )
+  )
+    throw new AxiError(
+      "--data-type must be TEXT, SINGLE_SELECT, DATE or NUMBER",
+      "VALIDATION_ERROR",
+    );
 
   const ghArgs = [
-    "project", "field-create", String(num), "--name", name,
-    "--data-type", dataType, "--format", "json", ...ownerArgs(owner),
+    "project",
+    "field-create",
+    String(num),
+    "--name",
+    name,
+    "--data-type",
+    dataType,
+    "--format",
+    "json",
+    ...ownerArgs(owner),
   ];
   pushRepeated(ghArgs, "--single-select-options", options);
   const created = await ghJson<ProjectItem>(ghArgs);
@@ -515,12 +544,21 @@ async function projectFieldCreate(
 async function projectFieldDelete(args: string[]): Promise<string> {
   const id = takeAllFlags(args, "--id", [...PROJECT_FLAGS["field-delete"]])[0];
   if (!id)
-    throw new AxiError("--id is required: gh-axi project field-delete --id <field-id>", "VALIDATION_ERROR");
+    throw new AxiError(
+      "--id is required: gh-axi project field-delete --id <field-id>",
+      "VALIDATION_ERROR",
+    );
   const deleted = await ghJson<ProjectItem>([
-    "project", "field-delete", "--id", id, "--format", "json",
+    "project",
+    "field-delete",
+    "--id",
+    id,
+    "--format",
+    "json",
   ]);
   return renderDetail("deleted", { id: deleted.id ?? id, status: "ok" }, [
-    field("id"), field("status"),
+    field("id"),
+    field("status"),
   ]);
 }
 
@@ -1013,10 +1051,20 @@ export async function projectCommand(
       );
       return projectFieldList(rest, ctx);
     case "field-create":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["field-create"], "project", "field-create");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["field-create"],
+        "project",
+        "field-create",
+      );
       return projectFieldCreate(rest, ctx);
     case "field-delete":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["field-delete"], "project", "field-delete");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["field-delete"],
+        "project",
+        "field-delete",
+      );
       return projectFieldDelete(rest);
     case "item-add":
       rejectUnknownFlags(
