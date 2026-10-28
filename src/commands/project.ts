@@ -64,9 +64,18 @@ export const PROJECT_FLAGS: Record<string, readonly string[]> = {
   "item-add": ["--owner", "--url"],
   "item-create": ["--owner", "--title", "--body", "--body-file"],
   "item-edit": [
-    "--id", "--project-id", "--field-id", "--text", "--number", "--date",
-    "--single-select-option-id", "--iteration-id", "--title", "--body",
-    "--body-file", "--clear",
+    "--id",
+    "--project-id",
+    "--field-id",
+    "--text",
+    "--number",
+    "--date",
+    "--single-select-option-id",
+    "--iteration-id",
+    "--title",
+    "--body",
+    "--body-file",
+    "--clear",
   ],
   "item-archive": ["--owner", "--id", "--undo"],
   "item-delete": ["--owner", "--id"],
@@ -74,11 +83,12 @@ export const PROJECT_FLAGS: Record<string, readonly string[]> = {
   edit: ["--owner", "--title", "--description", "--readme", "--visibility"],
   close: ["--owner", "--undo"],
   copy: ["--source-owner", "--target-owner", "--title", "--drafts"],
+  delete: ["--owner"],
 };
 
 export const PROJECT_HELP = `usage: gh-axi project <subcommand> [flags]
-subcommands[13]:
-  list, view <number>, item-list <number>, field-list <number>, item-add <number>, item-create <number>, item-edit, item-archive <number>, item-delete <number>, create, edit <number>, close <number>, copy <number>
+subcommands[14]:
+  list, view <number>, item-list <number>, field-list <number>, item-add <number>, item-create <number>, item-edit, item-archive <number>, item-delete <number>, create, edit <number>, close <number>, copy <number>, delete <number>
 flags{list}:
   --owner <login>, --closed, --limit <n> (default 30)
 flags{view}:
@@ -105,6 +115,8 @@ flags{close}:
   --owner <login>, --undo
 flags{copy}:
   --source-owner <login> (default current repo owner, else @me), --target-owner <login> (required), --title <text> (required), --drafts
+flags{delete}:
+  --owner <login>
 notes:
   --owner defaults to the current repo's owner when run inside a repo, otherwise the authenticated user.
   Requires the \`project\` (or \`read:project\`) OAuth scope - scope errors include the exact \`gh auth refresh -s <scope>\` command to run.
@@ -113,7 +125,8 @@ examples:
   gh-axi project view 3 --owner my-org
   gh-axi project item-add 3 --owner my-org --url https://github.com/my-org/repo/issues/12
   gh-axi project item-list 3 --owner my-org
-  gh-axi project create --owner my-org --title "Roadmap"`;
+  gh-axi project create --owner my-org --title "Roadmap"
+  gh-axi project delete 4 --owner my-org`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -848,6 +861,76 @@ async function projectCopy(args: string[], ctx?: RepoContext): Promise<string> {
   ]);
 }
 
+async function projectDelete(
+  args: string[],
+  ctx?: RepoContext,
+): Promise<string> {
+  const owner = resolveOwner(args, ctx);
+  const num = takeProjectNumber(args);
+
+  const project = await ghJson<ProjectRecord>([
+    "project",
+    "view",
+    String(num),
+    "--format",
+    "json",
+    ...ownerArgs(owner),
+  ]);
+
+  const title = project.title;
+  const projectLabel = title
+    ? `project "${title}" (#${num})`
+    : `project #${num}`;
+
+  const itemCount = project.items?.totalCount;
+  if (typeof itemCount !== "number") {
+    throw new AxiError(
+      `Cannot delete ${projectLabel} because its item count could not be determined`,
+      "VALIDATION_ERROR",
+    );
+  }
+
+  if (itemCount > 0) {
+    const ownerFlagText = owner ? ` --owner ${owner}` : "";
+    throw new AxiError(
+      `Cannot delete ${projectLabel} because it has ${itemCount} item${itemCount === 1 ? "" : "s"}; only empty projects can be deleted`,
+      "VALIDATION_ERROR",
+      [
+        `Remove all items first with \`gh-axi project item-list ${num}${ownerFlagText}\` and \`item-delete\`, or close the project with \`gh-axi project close ${num}${ownerFlagText}\``,
+      ],
+    );
+  }
+
+  process.stderr.write(
+    `Deleting ${projectLabel}: title=${title ?? ""} item_count=${itemCount}\n`,
+  );
+
+  await ghJson<ProjectRecord>([
+    "project",
+    "delete",
+    String(num),
+    "--format",
+    "json",
+    ...ownerArgs(owner),
+  ]);
+
+  return renderOutput([
+    renderDetail(
+      "deleted",
+      {
+        number: num,
+        title: project.title ?? null,
+        item_count: itemCount,
+        status: "ok",
+      },
+      [field("number"), field("title"), field("item_count"), field("status")],
+    ),
+    renderHelp(
+      getSuggestions({ domain: "project", action: "delete", id: num, owner }),
+    ),
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -867,25 +950,60 @@ export async function projectCommand(
       rejectUnknownFlags(rest, PROJECT_FLAGS.view, "project", "view");
       return projectView(rest, ctx);
     case "item-list":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-list"], "project", "item-list");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-list"],
+        "project",
+        "item-list",
+      );
       return projectItemList(rest, ctx);
     case "field-list":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["field-list"], "project", "field-list");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["field-list"],
+        "project",
+        "field-list",
+      );
       return projectFieldList(rest, ctx);
     case "item-add":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-add"], "project", "item-add");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-add"],
+        "project",
+        "item-add",
+      );
       return projectItemAdd(rest, ctx);
     case "item-create":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-create"], "project", "item-create");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-create"],
+        "project",
+        "item-create",
+      );
       return projectItemCreate(rest, ctx);
     case "item-edit":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-edit"], "project", "item-edit");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-edit"],
+        "project",
+        "item-edit",
+      );
       return projectItemEdit(rest);
     case "item-archive":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-archive"], "project", "item-archive");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-archive"],
+        "project",
+        "item-archive",
+      );
       return projectItemArchive(rest, ctx);
     case "item-delete":
-      rejectUnknownFlags(rest, PROJECT_FLAGS["item-delete"], "project", "item-delete");
+      rejectUnknownFlags(
+        rest,
+        PROJECT_FLAGS["item-delete"],
+        "project",
+        "item-delete",
+      );
       return projectItemDelete(rest, ctx);
     case "create":
       rejectUnknownFlags(rest, PROJECT_FLAGS.create, "project", "create");
@@ -899,6 +1017,9 @@ export async function projectCommand(
     case "copy":
       rejectUnknownFlags(rest, PROJECT_FLAGS.copy, "project", "copy");
       return projectCopy(rest, ctx);
+    case "delete":
+      rejectUnknownFlags(rest, PROJECT_FLAGS.delete, "project", "delete");
+      return projectDelete(rest, ctx);
     case "--help":
     case "-h":
     case "help":

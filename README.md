@@ -158,6 +158,7 @@ A missing or empty `--env`, conflicting `--env` flags, `--env-file`, other `gh s
 A `variable set --body` value is visible in the `gh-axi` process argv, but it is piped to `gh variable set` so the child process does not receive it in argv.
 `gh-axi project` wraps GitHub Projects (v2) and requires the `project` (or `read:project`) OAuth scope; if a call fails on a missing scope, gh-axi tells you the `gh auth refresh -s <scope>` command to run.
 `--owner` defaults to the current repo's owner, falling back to explicit `@me` for the authenticated user.
+`gh-axi project delete <number>` deletes only empty projects: it refuses when the project still has items or its item count cannot be determined, and otherwise reports the deleted project's title.
 
 `gh-axi gist create` requires `--public` or `--secret` explicitly — passing neither (or both) is an error.
 Gist visibility is fixed at creation; a secret gist is unlisted (anyone with the URL can read it), not private.
@@ -176,25 +177,25 @@ When a bare (non-JSON) `--jq`/`--template` result still exceeds the raw output l
 
 ### Commands
 
-| Command      | Description                                                                 |
-| ------------ | --------------------------------------------------------------------------- |
-| `issue`      | Issues — list, view, create, edit, close, reopen, comment, subissue         |
-| `pr`         | Pull requests — list, view, create, merge, review, checks                   |
-| `discussion` | Discussions (gh preview) - list, view with nested replies, comment or reply |
-| `stack`      | Stacked branches and PRs - create, submit, sync, rebase, merge, navigate    |
-| `run`        | Existing workflow runs - list, view, watch, rerun, cancel, delete, download |
-| `workflow`   | Workflows - list, view, run (trigger), enable, disable                      |
-| `release`    | Releases — list, view, create, edit, delete                                 |
-| `repo`       | Repositories — list, view, create, edit, clone, fork                        |
-| `label`      | Labels — list, create, edit, delete                                         |
-| `gist`       | Gists — list, view, edit, rename, create, delete, clone                     |
-| `project`    | Projects (v2) - list, view, create, edit, close, copy, items, fields        |
-| `secret`     | Actions secrets — list, set, delete                                         |
-| `variable`   | Actions variables — list, set, delete                                       |
-| `search`     | Search issues, PRs, repos, commits, code                                    |
-| `api`        | Raw GitHub API access                                                       |
-| `setup`      | Install optional agent session hooks                                        |
-| `update`     | Built-in self-update command inherited from `axi-sdk-js`                    |
+| Command      | Description                                                                  |
+| ------------ | ---------------------------------------------------------------------------- |
+| `issue`      | Issues — list, view, create, edit, close, reopen, comment, subissue          |
+| `pr`         | Pull requests — list, view, create, merge, review, checks                    |
+| `discussion` | Discussions (gh preview) - list, view with nested replies, comment or reply  |
+| `stack`      | Stacked branches and PRs - create, submit, sync, rebase, merge, navigate     |
+| `run`        | Existing workflow runs - list, view, watch, rerun, cancel, delete, download  |
+| `workflow`   | Workflows - list, view, run (trigger), enable, disable                       |
+| `release`    | Releases — list, view, create, edit, delete                                  |
+| `repo`       | Repositories — list, view, create, edit, clone, fork                         |
+| `label`      | Labels — list, create, edit, delete                                          |
+| `gist`       | Gists — list, view, edit, rename, create, delete, clone                      |
+| `project`    | Projects (v2) - list, view, create, edit, close, copy, delete, items, fields |
+| `secret`     | Actions secrets — list, set, delete                                          |
+| `variable`   | Actions variables — list, set, delete                                        |
+| `search`     | Search issues, PRs, repos, commits, code                                     |
+| `api`        | Raw GitHub API access                                                        |
+| `setup`      | Install optional agent session hooks                                         |
+| `update`     | Built-in self-update command inherited from `axi-sdk-js`                     |
 
 ### Global flags
 
