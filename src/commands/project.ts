@@ -499,14 +499,29 @@ async function projectFieldList(
   ]);
 }
 
+function takeSingleFieldFlag(
+  args: string[],
+  flag: string,
+  flags: string[],
+): string | undefined {
+  const values = takeAllFlags(args, flag, flags);
+  if (values.length > 1)
+    throw new AxiError(
+      `${flag} may only be specified once`,
+      "VALIDATION_ERROR",
+    );
+  return values[0];
+}
+
 async function projectFieldCreate(
   args: string[],
   ctx?: RepoContext,
 ): Promise<string> {
   const flags = [...PROJECT_FLAGS["field-create"]];
-  const owner = takeAllFlags(args, "--owner", flags)[0] ?? ctx?.owner ?? "@me";
-  const name = takeAllFlags(args, "--name", flags)[0];
-  const dataType = takeAllFlags(args, "--data-type", flags)[0];
+  const owner =
+    takeSingleFieldFlag(args, "--owner", flags) ?? ctx?.owner ?? "@me";
+  const name = takeSingleFieldFlag(args, "--name", flags);
+  const dataType = takeSingleFieldFlag(args, "--data-type", flags);
   const options = takeAllFlags(args, "--single-select-options", flags);
   const num = takeProjectNumber(args);
   if (!name || !dataType)
@@ -542,7 +557,9 @@ async function projectFieldCreate(
 }
 
 async function projectFieldDelete(args: string[]): Promise<string> {
-  const id = takeAllFlags(args, "--id", [...PROJECT_FLAGS["field-delete"]])[0];
+  const id = takeSingleFieldFlag(args, "--id", [
+    ...PROJECT_FLAGS["field-delete"],
+  ]);
   if (!id)
     throw new AxiError(
       "--id is required: gh-axi project field-delete --id <field-id>",

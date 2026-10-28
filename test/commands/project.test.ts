@@ -151,6 +151,40 @@ describe("projectCommand", () => {
     });
   });
 
+  describe("single-value field flags", () => {
+    const cases = [
+      { command: "field-create", flag: "--owner", value: "octo" },
+      { command: "field-create", flag: "--name", value: "Priority" },
+      { command: "field-create", flag: "--data-type", value: "TEXT" },
+      { command: "field-delete", flag: "--id", value: "PVTF_old" },
+    ];
+
+    for (const { command, flag, value } of cases) {
+      it.each(["separate", "equals", "mixed"])(
+        `rejects repeated ${command} ${flag} in %s form before calling gh`,
+        async (form) => {
+          const args =
+            command === "field-create"
+              ? ["3", "--name=Priority", "--data-type=TEXT"].filter(
+                  (arg) => !arg.startsWith(`${flag}=`),
+                )
+              : [];
+          const first =
+            form === "equals" ? [`${flag}=${value}`] : [flag, value];
+          const second =
+            form === "separate" ? [flag, value] : [`${flag}=${value}`];
+          await expect(
+            projectCommand([command, ...args, ...first, ...second], ctx),
+          ).rejects.toMatchObject({
+            message: `${flag} may only be specified once`,
+            code: "VALIDATION_ERROR",
+          });
+          expect(mockedGhJson).not.toHaveBeenCalled();
+        },
+      );
+    }
+  });
+
   describe("field-delete", () => {
     it("deletes by global field id without owner or repo arguments", async () => {
       mockedGhJson.mockResolvedValue({ id: "PVTF_old" });
