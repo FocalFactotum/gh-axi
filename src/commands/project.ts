@@ -5,7 +5,7 @@ import { AxiError } from "../errors.js";
 import { takeBody, truncateBody } from "../body.js";
 import { formatCountLine } from "../format.js";
 import { getSuggestions } from "../suggestions.js";
-import { takeFlag, takeBoolFlag, rejectUnknownFlags } from "../args.js";
+import { takeFlag, takeAllFlags, pushRepeated, takeBoolFlag, rejectUnknownFlags } from "../args.js";
 import {
   field,
   pluck,
@@ -61,6 +61,8 @@ export const PROJECT_FLAGS: Record<string, readonly string[]> = {
   view: ["--owner"],
   "item-list": ["--owner", "--query", "--limit"],
   "field-list": ["--owner", "--limit"],
+  "field-create": ["--owner", "--name", "--data-type", "--single-select-options"],
+  "field-delete": ["--id"],
   "item-add": ["--owner", "--url"],
   "item-create": ["--owner", "--title", "--body", "--body-file"],
   "item-edit": [
@@ -87,8 +89,8 @@ export const PROJECT_FLAGS: Record<string, readonly string[]> = {
 };
 
 export const PROJECT_HELP = `usage: gh-axi project <subcommand> [flags]
-subcommands[14]:
-  list, view <number>, item-list <number>, field-list <number>, item-add <number>, item-create <number>, item-edit, item-archive <number>, item-delete <number>, create, edit <number>, close <number>, copy <number>, delete <number>
+subcommands[16]:
+  list, view <number>, item-list <number>, field-list <number>, field-create <number>, field-delete, item-add <number>, item-create <number>, item-edit, item-archive <number>, item-delete <number>, create, edit <number>, close <number>, copy <number>, delete <number>
 flags{list}:
   --owner <login>, --closed, --limit <n> (default 30)
 flags{view}:
@@ -97,6 +99,10 @@ flags{item-list}:
   --owner <login>, --query <filter>, --limit <n> (default 30)
 flags{field-list}:
   --owner <login>, --limit <n> (default 30)
+flags{field-create}:
+  --owner <login>, --name <text> (required), --data-type <TEXT|SINGLE_SELECT|DATE|NUMBER> (required), --single-select-options <name,...> (repeatable)
+flags{field-delete}:
+  --id <field-id> (required)
 flags{item-add}:
   --owner <login>, --url <text> (required)
 flags{item-create}:
@@ -126,7 +132,9 @@ examples:
   gh-axi project item-add 3 --owner my-org --url https://github.com/my-org/repo/issues/12
   gh-axi project item-list 3 --owner my-org
   gh-axi project create --owner my-org --title "Roadmap"
-  gh-axi project delete 4 --owner my-org`;
+  gh-axi project delete 4 --owner my-org
+  gh-axi project field-create 3 --owner my-org --name Priority --data-type SINGLE_SELECT --single-select-options P0,P1,P2,P3
+  gh-axi project field-delete --id PVTSSF_field`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,6 +179,9 @@ const PROJECT_NUMBER_VALUE_FLAGS = new Set([
   "--visibility",
   "--source-owner",
   "--target-owner",
+  "--name",
+  "--data-type",
+  "--single-select-options",
 ]);
 
 const PROJECT_ITEM_BODY_TRUNCATION_OPTIONS = {
@@ -474,6 +485,42 @@ async function projectFieldList(
         owner,
       }),
     ),
+  ]);
+}
+
+async function projectFieldCreate(
+  args: string[],
+  ctx?: RepoContext,
+): Promise<string> {
+  const flags = [...PROJECT_FLAGS["field-create"]];
+  const owner = takeAllFlags(args, "--owner", flags)[0] ?? ctx?.owner ?? "@me";
+  const name = takeAllFlags(args, "--name", flags)[0];
+  const dataType = takeAllFlags(args, "--data-type", flags)[0];
+  const options = takeAllFlags(args, "--single-select-options", flags);
+  const num = takeProjectNumber(args);
+  if (!name || !dataType)
+    throw new AxiError("--name and --data-type are required", "VALIDATION_ERROR");
+  if (!["TEXT", "SINGLE_SELECT", "DATE", "NUMBER"].includes(dataType.toUpperCase()))
+    throw new AxiError("--data-type must be TEXT, SINGLE_SELECT, DATE or NUMBER", "VALIDATION_ERROR");
+
+  const ghArgs = [
+    "project", "field-create", String(num), "--name", name,
+    "--data-type", dataType, "--format", "json", ...ownerArgs(owner),
+  ];
+  pushRepeated(ghArgs, "--single-select-options", options);
+  const created = await ghJson<ProjectItem>(ghArgs);
+  return renderProjectFields([created]);
+}
+
+async function projectFieldDelete(args: string[]): Promise<string> {
+  const id = takeAllFlags(args, "--id", [...PROJECT_FLAGS["field-delete"]])[0];
+  if (!id)
+    throw new AxiError("--id is required: gh-axi project field-delete --id <field-id>", "VALIDATION_ERROR");
+  const deleted = await ghJson<ProjectItem>([
+    "project", "field-delete", "--id", id, "--format", "json",
+  ]);
+  return renderDetail("deleted", { id: deleted.id ?? id, status: "ok" }, [
+    field("id"), field("status"),
   ]);
 }
 
@@ -965,6 +1012,12 @@ export async function projectCommand(
         "field-list",
       );
       return projectFieldList(rest, ctx);
+    case "field-create":
+      rejectUnknownFlags(rest, PROJECT_FLAGS["field-create"], "project", "field-create");
+      return projectFieldCreate(rest, ctx);
+    case "field-delete":
+      rejectUnknownFlags(rest, PROJECT_FLAGS["field-delete"], "project", "field-delete");
+      return projectFieldDelete(rest);
     case "item-add":
       rejectUnknownFlags(
         rest,

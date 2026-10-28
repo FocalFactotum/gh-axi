@@ -160,6 +160,8 @@ A missing or empty `--env`, conflicting `--env` flags, `--env-file`, other `gh s
 `gh-axi variable` accepts `--body`/`-b` or piped stdin, and variable values are shown in `list` output because variables are not secret.
 A `variable set --body` value is visible in the `gh-axi` process argv, but it is piped to `gh variable set` so the child process does not receive it in argv.
 `gh-axi project` wraps GitHub Projects (v2) and requires the `project` (or `read:project`) OAuth scope; if a call fails on a missing scope, gh-axi tells you the `gh auth refresh -s <scope>` command to run.
+
+Create fields with `gh-axi project field-create <number> --name <name> --data-type TEXT|SINGLE_SELECT|DATE|NUMBER [--owner <login>]`. For example, `gh-axi project field-create 3 --name Priority --data-type SINGLE_SELECT --single-select-options P0,P1,P2,P3` returns the field id and option ids in TOON, ready for `project item-edit --field-id ... --single-select-option-id ...`. `--single-select-options` accepts comma-separated names and is repeatable. Delete a field by its global id with `gh-axi project field-delete --id <field-id>`; deletion does not take a project number or owner.
 `--owner` defaults to the current repo's owner, falling back to explicit `@me` for the authenticated user.
 `gh-axi project delete <number>` deletes only empty projects: it refuses when the project still has items or its item count cannot be determined, and otherwise reports the deleted project's title.
 
